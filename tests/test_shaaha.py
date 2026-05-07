@@ -34,7 +34,7 @@ class TestImportHook:
 
     def test_shaaha_importable(self):
         import shaaha
-        assert shaaha.__version__ == "1.0.0"
+        assert shaaha.__version__ == "2.0.0"
 
     def test_hook_registered(self):
         import shaaha

@@ -4,18 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shaaha"
-version = "1.0.0"
-description = "Intelligent Meta-Dispatcher — one import, best backend, always."
+version = "2.0.0"
+description = "Intelligent Meta-Dispatcher — AI-powered backend selection, agent execution, and code optimization."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [
-    { name = "Shaaha", email = "shaaha@example.com" }
-]
-keywords = [
-    "meta-dispatcher", "import-hook", "backend-selection",
-    "numpy", "pandas", "polars", "pytorch", "dependency-management"
-]
+authors = [{ name = "Shaaha", email = "shaaha@example.com" }]
+keywords = ["meta-dispatcher","import-hook","backend-selection","ai-agent","code-optimizer","numpy","pandas","polars","pytorch"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -27,28 +22,25 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries",
-    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-
-# Shaaha has ZERO required dependencies — it works with whatever you have.
 dependencies = []
 
 [project.optional-dependencies]
-# Install a sensible default stack
-default = ["numpy", "pandas", "pillow", "matplotlib", "scikit-learn", "requests"]
-# Full scientific stack
-science = ["numpy", "scipy", "pandas", "polars", "matplotlib", "seaborn", "plotly", "scikit-learn", "statsmodels"]
-# GPU stack (requires CUDA drivers)
-gpu = ["torch", "cupy-cuda12x"]
-# NLP stack
-nlp = ["transformers", "spacy", "nltk"]
-# Development
-dev = ["pytest", "pytest-cov", "black", "ruff", "mypy", "pre-commit"]
+default  = ["numpy","pandas","pillow","matplotlib","scikit-learn","requests"]
+science  = ["numpy","scipy","pandas","polars","matplotlib","seaborn","plotly","scikit-learn","statsmodels"]
+gpu      = ["torch","cupy-cuda12x"]
+nlp      = ["transformers","spacy","nltk"]
+agent    = ["anthropic"]
+dashboard = ["flask"]
+dev      = ["pytest","pytest-cov","black","ruff","mypy","flask","anthropic"]
+all      = ["numpy","scipy","pandas","polars","matplotlib","seaborn","plotly",
+            "scikit-learn","statsmodels","requests","httpx","flask","anthropic","rich"]
 
 [project.urls]
-Homepage = "https://github.com/shaaha/shaaha"
+Homepage      = "https://github.com/shaaha/shaaha"
 Documentation = "https://shaaha.readthedocs.io"
-Repository = "https://github.com/shaaha/shaaha"
+Repository    = "https://github.com/shaaha/shaaha"
 "Bug Tracker" = "https://github.com/shaaha/shaaha/issues"
 
 [tool.setuptools.packages.find]
@@ -57,19 +49,10 @@ where = ["src"]
 [tool.setuptools.package-dir]
 "" = "src"
 
-[tool.black]
-line-length = 99
-target-version = ["py39", "py310", "py311", "py312"]
-
-[tool.ruff]
-line-length = 99
-select = ["E", "F", "I", "UP", "B"]
-
-[tool.mypy]
-python_version = "3.9"
-warn_return_any = true
-warn_unused_configs = true
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--tb=short -q"
+addopts   = "--tb=short -q"
+
+[tool.black]
+line-length    = 99
+target-version = ["py39","py310","py311","py312"]

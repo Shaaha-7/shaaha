@@ -50,7 +50,9 @@ class ShaahafFinder(importlib.abc.MetaPathFinder):
         _internals = {
             "importer", "router", "registry",
             "environment", "proxy", "installer", "wrappers",
-        }
+            "brain", "healer", "agent", "rewriter", "explainer",
+            "dashboard", "plugins", "collab", "safety",
+            }
         if domain in _internals:
             return None
 
