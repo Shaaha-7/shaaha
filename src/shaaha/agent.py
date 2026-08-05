@@ -11,6 +11,11 @@ The agent:
 3. Executes each step using the correct shaaha domain
 4. Shows real-time progress
 5. Saves a markdown report
+
+SECURITY: _execute_step() runs the plan's "code" fields through exec()
+with the calling process's full privileges - whether that plan came from
+the Claude API or the offline fallback planner. Never call agent()/run()
+with untrusted task strings or in a multi-tenant process.
 """
 from __future__ import annotations
 
@@ -38,6 +43,9 @@ Available shaaha domains:
 - shaaha.nlp        → transformers/spacy (pipeline, tokenize, etc.)
 - shaaha.http       → httpx/requests (get, post, etc.)
 
+Each step's domain proxy is available in your code as `shaaha_<domain>`,
+e.g. the "dataframe" domain is `shaaha_dataframe`, "math" is `shaaha_math`.
+
 Respond ONLY with valid JSON in this exact format:
 {
   "task_summary": "one sentence description of what you will do",
@@ -47,7 +55,7 @@ Respond ONLY with valid JSON in this exact format:
       "description": "Load the CSV file",
       "domain": "dataframe",
       "action": "read_csv",
-      "code": "data = shaaha_df.read_csv('{file_path}')",
+      "code": "data = shaaha_dataframe.read_csv('{file_path}')",
       "output_var": "data"
     }
   ],
@@ -127,41 +135,20 @@ class ShaahAgent:
 
     def _plan(self, task: str) -> Optional[dict]:
         """Call Claude API to get a JSON execution plan."""
+        import os
+        from shaaha._llm import call_claude, strip_json_fence
+
+        api_key = self.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            print("⚠️  No ANTHROPIC_API_KEY found. Using fallback planner.")
+            return self._fallback_plan(task)
+
         try:
-            import urllib.request
-            import os
-
-            api_key = self.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-            if not api_key:
-                print("⚠️  No ANTHROPIC_API_KEY found. Using fallback planner.")
-                return self._fallback_plan(task)
-
-            payload = json.dumps({
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 2000,
-                "system": _AGENT_SYSTEM_PROMPT,
-                "messages": [{"role": "user", "content": task}],
-            }).encode()
-
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
+            text = call_claude(
+                task, api_key, system=_AGENT_SYSTEM_PROMPT,
+                max_tokens=2000, timeout=30,
             )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read())
-                text = data["content"][0]["text"]
-                # Strip markdown fences if present
-                text = text.strip()
-                if text.startswith("```"):
-                    text = text.split("```")[1]
-                    if text.startswith("json"):
-                        text = text[4:]
-                return json.loads(text.strip())
+            return json.loads(strip_json_fence(text))
 
         except Exception as e:
             logger.warning("Agent LLM call failed: %s", e)
@@ -182,7 +169,7 @@ class ShaahAgent:
             steps.append({
                 "step_number": n, "description": f"Load {files[0]}",
                 "domain": "dataframe", "action": "read_csv",
-                "code": f"data = shaaha_df.read_csv('{files[0]}')",
+                "code": f"data = shaaha_dataframe.read_csv('{files[0]}')",
                 "output_var": "data"
             })
             n += 1
@@ -260,6 +247,9 @@ class ShaahAgent:
             # Inject previous step outputs
             exec_globals.update(self._context)
 
+            # SECURITY: runs with this process's full privileges - see the
+            # module docstring. `code` comes from the LLM plan or the
+            # offline fallback planner, never from raw user input directly.
             exec(code, exec_globals)   # noqa: S102
 
             # Capture output variables
@@ -300,13 +290,16 @@ class ShaahAgent:
             lines.append("")
 
         path = Path("shaaha_report.md")
-        path.write_text("\n".join(lines))
+        path.write_text("\n".join(lines), encoding="utf-8")
         return str(path)
 
 
 def agent(task: str, api_key: Optional[str] = None, save_report: bool = True) -> dict:
     """
     Public API — run a natural language task with the Shaaha Agent.
+
+    Security: this executes generated Python via exec() with the calling
+    process's full privileges. Only use with trusted task strings.
 
     Example:
         import shaaha

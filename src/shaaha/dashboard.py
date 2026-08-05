@@ -159,26 +159,16 @@ setInterval(load,10000);
 </body></html>'''
 
 
-def dashboard(port: int = 7842, open_browser: bool = True):
+def _build_app():
     """
-    Launch the Shaaha benchmark dashboard on a local web server.
+    Construct the Flask app (routes + API) without binding a port.
 
-    Args:
-        port:         local port (default 7842)
-        open_browser: auto-open in default browser
-
-    Example:
-        import shaaha
-        shaaha.dashboard()
+    Split out from dashboard() so the dashboard's actual behaviour —
+    the HTML shell and the /api/data payload shape — can be tested with
+    Flask's test_client() instead of only being verifiable by eyeballing
+    a real browser session.
     """
-    try:
-        from flask import Flask, jsonify
-    except ImportError:
-        print("[Shaaha] Dashboard requires Flask: pip install flask")
-        return
-
-    from shaaha.brain import Brain
-    from shaaha.router import Router
+    from flask import Flask, jsonify
 
     app_flask = Flask("shaaha_dashboard")
 
@@ -189,7 +179,10 @@ def dashboard(port: int = 7842, open_browser: bool = True):
 
     @app_flask.route("/api/data")
     def api_data():
+        from shaaha.brain import Brain
+        from shaaha.router import Router
         from shaaha.environment import Environment
+
         brain  = Brain()
         env    = Environment.probe()
         summary = brain.summary()
@@ -213,6 +206,27 @@ def dashboard(port: int = 7842, open_browser: bool = True):
                 "os":          env.os_name,
             },
         })
+
+    return app_flask
+
+
+def dashboard(port: int = 7842, open_browser: bool = True):
+    """
+    Launch the Shaaha benchmark dashboard on a local web server.
+
+    Args:
+        port:         local port (default 7842)
+        open_browser: auto-open in default browser
+
+    Example:
+        import shaaha
+        shaaha.dashboard()
+    """
+    try:
+        app_flask = _build_app()
+    except ImportError:
+        print("[Shaaha] Dashboard requires Flask: pip install flask")
+        return
 
     url = f"http://127.0.0.1:{port}"
     print(f"\n🚀 [Shaaha Dashboard] Running at {url}")

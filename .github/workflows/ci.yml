@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Deliberately light (numpy/pandas/pillow/sklearn/matplotlib/requests),
+      # not the full `all` extra - keeps the 12-way matrix fast. The
+      # self-healer / multi-backend-cascade path is exercised separately
+      # in the `healer-cascade` job below, on one OS/version only.
+      - name: Install shaaha[dev,default]
+        run: pip install -e ".[dev,default]"
+
+      - name: Run test suite
+        run: pytest tests/ -v
+
+  healer-cascade:
+    # Exercises the scenario that shipped broken in 2.0.1: multiple
+    # domain-incompatible backends installed together (torch + xgboost +
+    # sklearn), so the self-healer actually has to cascade through
+    # candidates rather than trivially landing on the only one present.
+    name: self-healer cascade (torch+xgboost+sklearn)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install shaaha[dev,default] + torch + xgboost
+        run: pip install -e ".[dev,default]" torch xgboost --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run full test suite
+        run: pytest tests/ -v
+
+  minimal-install:
+    # Enforces the README's "pip install shaaha # zero dependencies"
+    # promise. No optional extras at all - if this job breaks, that
+    # headline claim is no longer true.
+    name: zero-dependency install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install shaaha with no extras
+        run: pip install .
+
+      - name: Confirm nothing beyond shaaha/pip/setuptools got pulled in
+        run: |
+          installed=$(pip list --format=freeze | grep -viE '^(pip|setuptools|shaaha)==' || true)
+          if [ -n "$installed" ]; then
+            echo "Unexpected packages installed alongside a bare 'pip install shaaha':"
+            echo "$installed"
+            exit 1
+          fi
+
+      - name: Smoke test core functionality with zero optional deps
+        run: |
+          python -c "
+          import shaaha
+          assert shaaha.status()['version']
+          shaaha.safe_mode(True); shaaha.safe_mode(False)
+          import shaaha.json as sj
+          assert sj.loads(sj.dumps({'a': 1})) == {'a': 1}
+          try:
+              import shaaha.math as sm
+              sm.array([1, 2, 3])
+              raise SystemExit('expected ImportError: no math backend should be installed')
+          except ImportError:
+              pass
+          print('zero-dependency smoke test passed')
+          "

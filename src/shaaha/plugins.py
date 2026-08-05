@@ -39,7 +39,7 @@ class PluginRegistry:
     def _load(self) -> dict:
         try:
             if _PLUGINS_FILE.exists():
-                return json.loads(_PLUGINS_FILE.read_text())
+                return json.loads(_PLUGINS_FILE.read_text(encoding="utf-8"))
         except Exception as e:
             logger.warning("Plugins: load failed: %s", e)
         return {}
@@ -47,7 +47,7 @@ class PluginRegistry:
     def _save(self):
         try:
             _PLUGINS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            _PLUGINS_FILE.write_text(json.dumps(self._plugins, indent=2))
+            _PLUGINS_FILE.write_text(json.dumps(self._plugins, indent=2), encoding="utf-8")
         except Exception as e:
             logger.warning("Plugins: save failed: %s", e)
 

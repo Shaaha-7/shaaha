@@ -51,9 +51,14 @@ def _build_flat_map(module) -> dict:
                                 flat[attr] = getattr(sub, attr)
                             except Exception:
                                 pass
-                except Exception:
+                except BaseException:
+                    # Some packages (e.g. xgboost.testing) raise test-framework
+                    # "skip" signals at import time, which subclass BaseException
+                    # rather than Exception specifically to survive `except
+                    # Exception` handlers like this one. This is a best-effort
+                    # introspection walk, so swallow anything and move on.
                     pass
-        except Exception:
+        except BaseException:
             pass
     return flat
 

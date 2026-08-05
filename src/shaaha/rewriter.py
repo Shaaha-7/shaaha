@@ -83,14 +83,18 @@ REWRITE_RULES = [
         None,
     ),
     (
+        # Report-only: iterrows() is almost always embedded mid-statement
+        # (e.g. `for i, row in df.iterrows():`), so blindly regex-splicing a
+        # comment in place of the match corrupts the surrounding statement.
+        # Flag it in the findings table/report instead of rewriting it.
         r"df\.iterrows\(\)",
-        "# SLOW: iterrows() — consider df.apply() or vectorised ops",
+        None,
         "10-100x",
         "iterrows() is the slowest pandas pattern — vectorise instead",
     ),
     (
         r"for .+ in df\.iterrows",
-        "# WARNING: iterrows loop detected — replace with vectorised operation",
+        None,
         "10-100x",
         "Loop over iterrows is extremely slow for large dataframes",
     ),
@@ -138,16 +142,38 @@ class CodeRewriter:
         rewritten = original
         for change in changes:
             if change.get("pattern") and change.get("replacement"):
-                rewritten = re.sub(
+                candidate = re.sub(
                     change["pattern"], change["replacement"],
                     rewritten, count=1
                 )
+                # Safety net: never keep a substitution that breaks the file's
+                # syntax — regex substitution has no idea it might be sitting
+                # mid-statement (e.g. inside a `for ... :` header). This also
+                # guards the LLM-sourced rule path, not just the static rules.
+                try:
+                    compile(candidate, filepath, "exec")
+                    rewritten = candidate
+                except SyntaxError:
+                    logger.warning(
+                        "Skipping change (would break syntax): %s -> %s",
+                        change["pattern"], change["replacement"],
+                    )
+                    change["skipped"] = "would have produced invalid syntax"
+
+        speedup = self._summarise_speedup(changes)
+
+        if rewritten == original:
+            # Every candidate was either report-only (e.g. iterrows — flagged
+            # but not text-substitutable) or got rejected by the syntax check.
+            self._print_change_table(changes)
+            print("\nℹ️  Found issues worth fixing by hand, but nothing could be "
+                  "safely auto-applied — see notes above.")
+            return {"original": original, "rewritten": original,
+                    "changes": changes, "speedup_summary": speedup}
 
         # Show diff
         self._print_diff(original, rewritten)
         self._print_change_table(changes)
-
-        speedup = self._summarise_speedup(changes)
         print(f"\n⚡ Estimated overall speedup: {speedup}")
 
         # Ask for confirmation
@@ -198,7 +224,8 @@ class CodeRewriter:
 
     def _llm_analyse(self, code: str, filepath: str) -> list[dict]:
         """Ask Claude to find optimisations beyond static rules."""
-        import os, urllib.request
+        import os
+        from shaaha._llm import call_claude, strip_json_fence
 
         api_key = self.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
@@ -230,29 +257,8 @@ Also flag: iterrows loops, unnecessary copies, non-vectorised operations.
 Return [] if no changes needed."""
 
         try:
-            payload = json.dumps({
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1500,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode()
-
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                data = json.loads(resp.read())
-                text = data["content"][0]["text"].strip()
-                if text.startswith("```"):
-                    text = text.split("```")[1]
-                    if text.startswith("json"):
-                        text = text[4:]
-                return json.loads(text.strip())
+            text = call_claude(prompt, api_key, max_tokens=1500, timeout=20)
+            return json.loads(strip_json_fence(text))
         except Exception as e:
             logger.warning("LLM rewriter failed: %s — using rules", e)
             return self._rule_analyse(code)

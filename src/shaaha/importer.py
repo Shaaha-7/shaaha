@@ -51,7 +51,7 @@ class ShaahafFinder(importlib.abc.MetaPathFinder):
             "importer", "router", "registry",
             "environment", "proxy", "installer", "wrappers",
             "brain", "healer", "agent", "rewriter", "explainer",
-            "dashboard", "plugins", "collab", "safety",
+            "dashboard", "plugins", "collab", "safety", "_llm", "cli",
             }
         if domain in _internals:
             return None
@@ -85,9 +85,10 @@ class ShaahaaLoader(importlib.abc.Loader):
     def exec_module(self, module):
         from shaaha.proxy import ProxyModule
         from shaaha.router import Router
+        from shaaha.healer import get_healer
 
         # Inject proxy behaviour into the module namespace
-        proxy = ProxyModule(self.domain, Router)
+        proxy = ProxyModule(self.domain, Router, get_healer())
         module.__class__ = proxy.__class__
         module.__dict__.update(proxy.__dict__)
         module.__loader__ = self
@@ -101,13 +102,14 @@ class ShaahaaLoader(importlib.abc.Loader):
 
         from shaaha.proxy import ProxyModule
         from shaaha.router import Router
+        from shaaha.healer import get_healer
 
         mod = types.ModuleType(fullname)
         mod.__loader__ = self
         mod.__package__ = _SHAAHA_PACKAGE
         mod.__spec__ = None
 
-        proxy = ProxyModule(self.domain, Router)
+        proxy = ProxyModule(self.domain, Router, get_healer())
         mod.__class__ = proxy.__class__
         mod.__dict__.update(proxy.__dict__)
 

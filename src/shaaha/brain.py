@@ -42,7 +42,7 @@ class Brain:
         try:
             _PROFILE_DIR.mkdir(parents=True, exist_ok=True)
             if _PROFILE_FILE.exists():
-                return json.loads(_PROFILE_FILE.read_text())
+                return json.loads(_PROFILE_FILE.read_text(encoding="utf-8"))
         except Exception as e:
             logger.warning("Brain: could not load profile: %s", e)
         return {"version": "2.0", "operations": {}, "created": datetime.now().isoformat()}
@@ -50,7 +50,7 @@ class Brain:
     def _save(self):
         try:
             _PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-            _PROFILE_FILE.write_text(json.dumps(self._data, indent=2))
+            _PROFILE_FILE.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
         except Exception as e:
             logger.warning("Brain: could not save profile: %s", e)
 

@@ -10,7 +10,6 @@ shaaha.explain("my_script.py", output="report.md")
 from __future__ import annotations
 
 import re
-import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -216,7 +215,9 @@ class Explainer:
         return found
 
     def _llm_insights(self, code: str, filepath: str) -> str:
-        import os, urllib.request
+        import os
+        from shaaha._llm import call_claude
+
         api_key = self.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
             return ""
@@ -226,23 +227,7 @@ class Explainer:
             f"Be educational and encouraging. Code:\n```python\n{code[:2000]}\n```"
         )
         try:
-            payload = json.dumps({
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 500,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode()
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read())
-                return data["content"][0]["text"]
+            return call_claude(prompt, api_key, max_tokens=500, timeout=15)
         except Exception as e:
             logger.debug("LLM explainer failed: %s", e)
             return ""

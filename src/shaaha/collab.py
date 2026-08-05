@@ -49,7 +49,7 @@ def share_profile(output_path: Optional[str] = None) -> str:
     }
 
     out = Path(output_path or "shaaha_profile_export.json")
-    out.write_text(json.dumps(export, indent=2))
+    out.write_text(json.dumps(export, indent=2), encoding="utf-8")
     print(f"✅ [Shaaha] Profile exported to: {out}")
     print(f"   Share this file with teammates — they can import it with:")
     print(f"   shaaha.import_profile('{out}')")
@@ -73,7 +73,7 @@ def import_profile(filepath: str, merge: bool = True):
     if not path.exists():
         raise FileNotFoundError(f"[Shaaha] Profile not found: {filepath}")
 
-    imported = json.loads(path.read_text())
+    imported = json.loads(path.read_text(encoding="utf-8"))
     brain    = Brain()
 
     their_ops = imported.get("operations", {})

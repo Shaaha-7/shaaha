@@ -372,8 +372,13 @@ class TestPublicAPIV2:
         assert "%" in s["brain_confidence"]
 
     def test_version_updated(self):
+        import re
+        import importlib.metadata
         import shaaha
-        assert shaaha.__version__ == "2.0.0"
+        # Single-sourced from package metadata (pyproject.toml) — this test
+        # should never need a manual bump again when the version changes.
+        assert shaaha.__version__ == importlib.metadata.version("shaaha")
+        assert re.match(r"^\d+\.\d+\.\d+", shaaha.__version__)
 
     def test_all_public_functions_exist(self):
         import shaaha

@@ -8,11 +8,26 @@ import logging
 from shaaha.importer import ShaahafFinder
 from shaaha.environment import Environment
 
-__version__ = "2.0.0"
 __author__  = "Shaaha"
 __license__ = "MIT"
 
+try:
+    from importlib.metadata import version as _pkg_version, PackageNotFoundError
+    __version__ = _pkg_version("shaaha")
+except Exception:
+    __version__ = "2.0.1"  # fallback for an uninstalled/editable checkout
+
 logging.getLogger("shaaha").addHandler(logging.NullHandler())
+
+# Shaaha prints emoji status messages (⚠️ ✅ 📄 ...) throughout the package.
+# On a default Windows console (cp1252, no PYTHONUTF8/chcp 65001) that raises
+# UnicodeEncodeError on the very first call. Force UTF-8 output so those
+# messages degrade to substituted characters instead of crashing.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 _finder = ShaahafFinder()
 if not any(isinstance(f, ShaahafFinder) for f in sys.meta_path):
@@ -49,8 +64,13 @@ def available_backends(domain: str) -> list:
     from shaaha.registry import Registry
     return Registry.available_backends(domain)
 
+def diagnose(domain=None) -> None:
+    """Print a transparent breakdown of routing decisions. Example: shaaha.diagnose() or shaaha.diagnose('ml')"""
+    from shaaha.registry import diagnose as _diagnose
+    _diagnose(domain)
+
 def agent(task: str, api_key=None, save_report: bool = True) -> dict:
-    """Run a natural language task. Example: shaaha.agent('load sales.csv and plot top 10')"""
+    """Run a natural language task via exec() - only use with trusted task strings. Example: shaaha.agent('load sales.csv and plot top 10')"""
     from shaaha.agent import agent as _agent
     return _agent(task, api_key=api_key, save_report=save_report)
 

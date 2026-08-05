@@ -171,8 +171,17 @@ class Registry:
 
             # Effective weight
             effective = b.weight
-            if b.gpu_preferred and (cuda or mps) and prefer_gpu:
-                effective += 20  # Boost GPU backends on GPU machines
+            if b.gpu_preferred:
+                if (cuda or mps) and prefer_gpu:
+                    effective += 20  # Boost GPU backends on GPU machines
+                else:
+                    # No GPU to exploit: a "gpu_preferred" backend (torch, jax...)
+                    # brings no benefit here and often isn't API-compatible with
+                    # the domain's standard CPU library (e.g. torch has no
+                    # LinearRegression, no top-level `array` that's a real
+                    # numpy.ndarray). Don't let its raw weight alone outrank the
+                    # standard CPU choice just because it happens to be installed.
+                    effective = min(effective, 40)
 
             scored.append((effective, b))
 
@@ -191,3 +200,89 @@ class Registry:
             REGISTRY[domain] = []
         REGISTRY[domain].append(backend)
         logger.info("Registered backend '%s' for domain '%s'", backend.name, domain)
+
+    @staticmethod
+    def diagnose(domain: str, cuda: bool = False, mps: bool = False,
+                 prefer_gpu: bool = True) -> list:
+        """
+        Read-only breakdown of how best_backend() would score every
+        registered candidate for `domain` - including ones excluded or not
+        installed, and why. Mirrors best_backend()'s rules for display
+        purposes; does not affect routing. Powers shaaha.diagnose().
+        """
+        report = []
+        for b in REGISTRY.get(domain, []):
+            installed = importlib.util.find_spec(b.import_name) is not None
+
+            if b.requires_cuda and not cuda:
+                report.append({"name": b.name, "installed": installed,
+                                "score": None, "status": "excluded (requires CUDA)"})
+                continue
+            if b.requires_mps and not mps:
+                report.append({"name": b.name, "installed": installed,
+                                "score": None, "status": "excluded (requires Apple MPS)"})
+                continue
+            if not installed:
+                report.append({"name": b.name, "installed": False,
+                                "score": None, "status": "not installed"})
+                continue
+
+            effective = b.weight
+            note = "eligible"
+            if b.gpu_preferred:
+                if (cuda or mps) and prefer_gpu:
+                    effective += 20
+                    note = f"eligible (+20 GPU boost, base weight {b.weight})"
+                else:
+                    capped = min(effective, 40)
+                    if capped != effective:
+                        note = (f"eligible (capped {effective}->{capped}: "
+                                 f"gpu_preferred but no GPU to exploit)")
+                    effective = capped
+
+            report.append({"name": b.name, "installed": True,
+                            "score": effective, "status": note})
+
+        report.sort(key=lambda r: (r["score"] is None, -(r["score"] or 0)))
+        for i, r in enumerate(report):
+            r["selected"] = (i == 0 and r["score"] is not None)
+        return report
+
+
+def diagnose(domain: Optional[str] = None) -> None:
+    """
+    Public API - print a transparent breakdown of routing decisions.
+
+    For each domain (or just `domain` if given), shows every registered
+    backend, whether it's installed, its effective score, and which one
+    would actually be selected right now - so "why did shaaha pick X"
+    never requires reading source code to answer.
+
+    Example:
+        import shaaha
+        shaaha.diagnose()
+        shaaha.diagnose("ml")
+    """
+    from shaaha.environment import Environment
+    from shaaha.router import Router
+
+    env = Environment.probe()
+    cfg = Router._config
+    domains = [domain] if domain else list(REGISTRY.keys())
+
+    print(f"\n🔍 [Shaaha] Routing diagnosis "
+          f"(cuda={env.cuda_available}, mps={env.mps_available}, "
+          f"prefer_gpu={cfg['prefer_gpu']})\n")
+
+    for dom in domains:
+        forced = cfg["force_backend"].get(dom)
+        print(f"  {dom}" + (f"  (forced -> '{forced}')" if forced else ""))
+        for r in Registry.diagnose(dom, cuda=env.cuda_available,
+                                    mps=env.mps_available,
+                                    prefer_gpu=cfg["prefer_gpu"]):
+            marker = "→" if (r["selected"] or r["name"] == forced) else " "
+            installed = "yes" if r["installed"] else "no "
+            score = f"{r['score']:>3}" if r["score"] is not None else "  -"
+            print(f"    {marker} {r['name']:<14} installed={installed}  "
+                  f"score={score}  {r['status']}")
+        print()

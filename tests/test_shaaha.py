@@ -33,8 +33,9 @@ class TestImportHook:
         _unload_shaaha()
 
     def test_shaaha_importable(self):
+        import re
         import shaaha
-        assert shaaha.__version__ == "2.0.0"
+        assert re.match(r"^\d+\.\d+\.\d+", shaaha.__version__), shaaha.__version__
 
     def test_hook_registered(self):
         import shaaha
