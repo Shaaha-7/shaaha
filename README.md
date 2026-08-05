@@ -1,11 +1,10 @@
-# Shaaha 🧠
+# Shaaha
 
 > **One import. Best backend. Always.**
 
 [![PyPI version](https://badge.fury.io/py/shaaha.svg)](https://pypi.org/project/shaaha/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://github.com/shaaha/shaaha/actions/workflows/test.yml/badge.svg)](https://github.com/shaaha/shaaha/actions)
 
 **Shaaha** is a Python meta-dispatcher library. Instead of memorising which
 library is fastest, whether your system has a GPU, or whether a colleague has
