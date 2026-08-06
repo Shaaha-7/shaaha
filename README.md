@@ -123,6 +123,9 @@ $ shaaha diagnose ml
       torch          installed=yes  score= 40  eligible (capped 95->40: gpu_preferred but no GPU to exploit)
 ```
 
+For just the plain list of what's currently importable, without the scoring
+breakdown: `shaaha.available_backends("ml")`.
+
 ---
 
 ## Self-Healing
@@ -264,6 +267,22 @@ by default. `shaaha diagnose <domain>` shows the live scoring.
 
 ---
 
+## Plugin System
+
+Register a custom backend at runtime — no code changes or PR needed. It's
+persisted to `~/.shaaha/plugins.json` and reloaded automatically on your next
+`import shaaha`:
+
+```python
+shaaha.register_backend("dataframe", "vaex", "vaex", priority=88)
+shaaha.list_backends("dataframe")
+```
+
+For a backend you want built into Shaaha itself for everyone, see
+[Contributing](#contributing) below instead.
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. Short version —
@@ -295,8 +314,8 @@ shaaha/
 │   ├── healer.py         # Self-healing fallback on missing attributes
 │   ├── brain.py          # Adaptive learning (local timing history)
 │   ├── installer.py      # Optional auto-pip-install
-│   ├── agent.py          # AI Agent (Layer 2)
-│   ├── rewriter.py        # Code Rewriter (Layer 3)
+│   ├── agent.py          # Natural-language task execution (exec()-based)
+│   ├── rewriter.py       # Code review / rewrite suggestions
 │   ├── explainer.py      # Plain-English explainer
 │   ├── dashboard.py      # Local web dashboard
 │   ├── plugins.py        # Runtime backend registration
