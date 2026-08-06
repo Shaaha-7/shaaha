@@ -315,19 +315,6 @@ shaaha/
 
 ---
 
-## For MSc Thesis
-
-Shaaha implements four advanced CS concepts worth discussing in your thesis:
-
-1. **Python Import Protocol (PEP 302/451)** — `sys.meta_path`, `MetaPathFinder`, `Loader`
-2. **Proxy Design Pattern** — transparent delegation via `__getattr__` on a `ModuleType` subclass
-3. **Context-Aware Dispatch** — weighted scoring with hardware-aware overrides, and a
-   self-healing fallback for when the top-scored backend doesn't implement the
-   attribute actually being called
-4. **Adaptive Learning** — local timing history nudging future routing decisions
-
----
-
 ## License
 
 MIT © Shabeer Ahamed
